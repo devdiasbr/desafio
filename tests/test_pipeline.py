@@ -42,6 +42,12 @@ class TestPipeline(unittest.TestCase):
                     cls.dbutils.fs.mkdirs(cls.test_dir)
                 except Exception as e:
                     print(f"Error creating DBFS dir: {e}")
+                    if "SESSION_CLOSED" in str(e) or "INVALID_HANDLE" in str(e):
+                        print("\n" + "="*80)
+                        print("CRITICAL ERROR: Spark Session is CLOSED.")
+                        print("Please RESTART your Databricks Cluster or Detach/Reattach your Notebook.")
+                        print("The previous test run might have stopped the session.")
+                        print("="*80 + "\n")
                     raise e
             else:
                  raise RuntimeError("DBUtils not available in Databricks environment")
