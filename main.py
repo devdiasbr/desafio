@@ -7,7 +7,12 @@ from src import gold
 def main():
     parser = argparse.ArgumentParser(description="Executar pipeline de vendas localmente.")
     parser.add_argument("--clean", action="store_true", help="Limpar diretórios de dados antes de executar.")
-    args = parser.parse_args()
+    
+    # Usar parse_known_args para evitar erros com argumentos internos do Databricks/Jupyter (ex: -f kernel.json)
+    args, unknown = parser.parse_known_args()
+    
+    if unknown and not utils.is_databricks():
+        print(f"Aviso: Argumentos desconhecidos ignorados: {unknown}")
 
     # Inicializar Spark Session única para todo o pipeline
     spark = utils.get_spark_session("VendasPipeline")
