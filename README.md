@@ -109,7 +109,8 @@ python -m unittest tests/test_pipeline.py
 
 *   **Suporte Híbrido:** O módulo `src/utils.py` detecta se o código está rodando localmente ou no Databricks (`DATABRICKS_RUNTIME_VERSION`) e ajusta as configurações automaticamente.
 *   **Modularidade:** O código foi refatorado para o diretório `src/`, separando responsabilidades.
-*   **Controle Incremental:** Na camada Bronze, um arquivo `processed.txt` controla a ingestão.
+*   **Controle Incremental:** Na camada Bronze, o código verifica diretamente os arquivos já existentes na tabela Delta para evitar reprocessamento (idempotência sem arquivos de controle externos).
+*   **Armazenamento Híbrido:** Usa caminhos de diretório locais (Windows/Linux) e **Tabelas Gerenciadas** (Managed Tables) no Databricks, garantindo compatibilidade com Clusters Shared e Unity Catalog.
 *   **Idempotência:** As camadas Silver e Gold utilizam `MERGE` para garantir consistência.
 
 ## 📊 Schema dos Dados
