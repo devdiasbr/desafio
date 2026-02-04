@@ -167,3 +167,38 @@ def add_filename_column(df, col_name="nome_arquivo"):
     else:
         # Execução local padrão
         return df.withColumn(col_name, input_file_name())
+
+def get_dbutils(spark):
+    """Retrieve DBUtils in Databricks or mimic it locally."""
+    if is_databricks():
+        try:
+            from pyspark.dbutils import DBUtils
+            return DBUtils(spark)
+        except ImportError:
+            # Fallback for environments where pyspark.dbutils is not available
+            return None
+    return None
+
+def list_files(path):
+    """List files in a directory, supporting both local OS and DBFS paths."""
+    if path.startswith("dbfs:"):
+        # Use DBUtils for DBFS paths
+        spark = get_spark_session()
+        dbutils = get_dbutils(spark)
+        if dbutils:
+            try:
+                files = dbutils.fs.ls(path)
+                return [f.name for f in files]
+            except Exception as e:
+                print(f"Error listing DBFS path {path}: {e}")
+                return []
+        else:
+            print("DBUtils not available for DBFS path listing.")
+            return []
+    else:
+        # Local filesystem
+        try:
+            return os.listdir(path)
+        except OSError as e:
+            print(f"Error listing local path {path}: {e}")
+            return []

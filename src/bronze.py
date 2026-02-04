@@ -25,7 +25,7 @@ def run_bronze(spark):
     utils.ensure_resources(spark)
 
     # Listar arquivos na pasta
-    all_files = [f for f in os.listdir(data_path) if f.endswith('.csv')]
+    all_files = [f for f in utils.list_files(data_path) if f.endswith('.csv')]
     processed_files = set()
     
     # Verificar arquivos já processados lendo diretamente da tabela Delta (Idempotência)
@@ -46,7 +46,11 @@ def run_bronze(spark):
     if new_files:
         # Ler apenas arquivos novos
         # Spark local path needs explicit protocol or valid path
-        file_paths = [os.path.join(data_path, f) for f in new_files]
+        if data_path.startswith("dbfs:"):
+             file_paths = [f"{data_path.rstrip('/')}/{f}" for f in new_files]
+        else:
+             file_paths = [os.path.join(data_path, f) for f in new_files]
+             
         df = spark.read.schema(schema).csv(file_paths)
         
         # Adicionar colunas
