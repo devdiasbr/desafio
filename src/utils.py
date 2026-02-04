@@ -35,15 +35,15 @@ def get_spark_session(app_name="DesafioLocal"):
     return spark
 
 # Define paths
+# A lógica de os.path.dirname(os.path.dirname(...)) garante que pegamos a raiz do projeto (desafio/)
+# assumindo que este arquivo está em desafio/src/utils.py
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
 if is_databricks():
-    # No Databricks Repos, os.getcwd() retorna a raiz do repo.
-    # Porém, para escrita de dados (Delta), é recomendável usar DBFS ou Volumes se for persistir.
-    # Aqui mantemos a lógica relativa para funcionar "out-of-the-box" no Repos, 
-    # mas em produção no Databricks, BASE_DIR deveria apontar para '/dbfs/...' ou '/Volumes/...'
-    BASE_DIR = os.getcwd()
+    # No Databricks Repos, mantemos a lógica relativa para funcionar "out-of-the-box" no Repos.
+    # Em produção (Jobs/Workflows), recomenda-se usar caminhos absolutos para Volumes ou DBFS.
+    pass
 else:
-    BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    
     # Configure Hadoop for Windows (apenas local)
     HADOOP_HOME = os.path.join(BASE_DIR, "hadoop")
     os.environ["HADOOP_HOME"] = HADOOP_HOME
