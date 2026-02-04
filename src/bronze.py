@@ -28,10 +28,18 @@ def run_bronze(spark):
     all_files = [f for f in os.listdir(data_path) if f.endswith('.csv')]
     processed_files = set()
     
-    processed_file_record = os.path.join(processed_files_path, "processed.txt")
-    if os.path.exists(processed_file_record):
-        with open(processed_file_record, 'r') as f:
-            processed_files = set(f.read().splitlines())
+    # Verificar arquivos já processados lendo diretamente da tabela Delta (Idempotência)
+    try:
+        # Tenta ler a tabela Bronze existente
+        df_processed = spark.read.format("delta").load(bronze_path).select("nome_arquivo").distinct()
+        rows = df_processed.collect()
+        # Extrai apenas o nome do arquivo (basename) do caminho completo
+        processed_files = {os.path.basename(r["nome_arquivo"]) for r in rows}
+        print(f"Arquivos já processados encontrados na Bronze: {len(processed_files)}")
+    except Exception:
+        # Tabela não existe (primeira execução) ou erro de acesso
+        print("Tabela Bronze não encontrada ou vazia. Processando todos os arquivos.")
+        processed_files = set()
 
     new_files = [f for f in all_files if f not in processed_files]
 
@@ -49,11 +57,6 @@ def run_bronze(spark):
         
         # Salvar em Delta (append para incremental)
         df_bronze.write.format("delta").mode("append").save(bronze_path)
-        
-        # Registrar arquivos processados
-        with open(processed_file_record, 'a') as f:
-            for file in new_files:
-                f.write(file + '\n')
         
         print(f"Processados {len(new_files)} arquivos novos.")
     else:

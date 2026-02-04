@@ -41,29 +41,43 @@ def get_spark_session(app_name="DesafioLocal"):
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 if is_databricks():
-    # No Databricks Repos, mantemos a lógica relativa para funcionar "out-of-the-box" no Repos.
-    # Em produção (Jobs/Workflows), recomenda-se usar caminhos absolutos para Volumes ou DBFS.
-    pass
+    # No Databricks, usamos DBFS para saída para evitar erros de sistema de arquivos somente leitura no Workspace
+    # DATA_RAW_PATH continua no Workspace (assumindo que os CSVs estão lá)
+    DBFS_BASE = "dbfs:/FileStore/desafio_beca_2026"
+    
+    DATA_RAW_PATH = os.path.join(BASE_DIR, "dados_vendas")
+    BRONZE_PATH = f"{DBFS_BASE}/data/bronze/vendas"
+    SILVER_PATH = f"{DBFS_BASE}/data/silver/vendas"
+    GOLD_FATO_PATH = f"{DBFS_BASE}/data/gold/fato_vendas"
+    GOLD_AGG_PATH = f"{DBFS_BASE}/data/gold/vendas_agregadas"
+    # PROCESSED_FILES_PATH não será mais usado com a nova lógica de idempotência baseada em Delta
+    PROCESSED_FILES_PATH = f"{DBFS_BASE}/data/bronze/processed_files"
+
 else:
     # Configure Hadoop for Windows (apenas local)
     HADOOP_HOME = os.path.join(BASE_DIR, "hadoop")
     os.environ["HADOOP_HOME"] = HADOOP_HOME
     os.environ["PATH"] += os.pathsep + os.path.join(HADOOP_HOME, "bin")
 
-DATA_RAW_PATH = os.path.join(BASE_DIR, "dados_vendas")
-BRONZE_PATH = os.path.join(BASE_DIR, "data", "bronze", "vendas")
-SILVER_PATH = os.path.join(BASE_DIR, "data", "silver", "vendas")
-GOLD_FATO_PATH = os.path.join(BASE_DIR, "data", "gold", "fato_vendas")
-GOLD_AGG_PATH = os.path.join(BASE_DIR, "data", "gold", "vendas_agregadas")
-PROCESSED_FILES_PATH = os.path.join(BASE_DIR, "data", "bronze", "processed_files")
+    DATA_RAW_PATH = os.path.join(BASE_DIR, "dados_vendas")
+    BRONZE_PATH = os.path.join(BASE_DIR, "data", "bronze", "vendas")
+    SILVER_PATH = os.path.join(BASE_DIR, "data", "silver", "vendas")
+    GOLD_FATO_PATH = os.path.join(BASE_DIR, "data", "gold", "fato_vendas")
+    GOLD_AGG_PATH = os.path.join(BASE_DIR, "data", "gold", "vendas_agregadas")
+    PROCESSED_FILES_PATH = os.path.join(BASE_DIR, "data", "bronze", "processed_files")
 
 # Ensure directories exist
 def ensure_directories():
-    os.makedirs(BRONZE_PATH, exist_ok=True)
-    os.makedirs(SILVER_PATH, exist_ok=True)
-    os.makedirs(GOLD_FATO_PATH, exist_ok=True)
-    os.makedirs(GOLD_AGG_PATH, exist_ok=True)
-    os.makedirs(PROCESSED_FILES_PATH, exist_ok=True)
+    if is_databricks():
+        # No Databricks, o Spark cria diretórios automaticamente ao escrever no DBFS.
+        # Não usamos os.makedirs em caminhos dbfs:/
+        pass
+    else:
+        os.makedirs(BRONZE_PATH, exist_ok=True)
+        os.makedirs(SILVER_PATH, exist_ok=True)
+        os.makedirs(GOLD_FATO_PATH, exist_ok=True)
+        os.makedirs(GOLD_AGG_PATH, exist_ok=True)
+        os.makedirs(PROCESSED_FILES_PATH, exist_ok=True)
 
 # Clean up for fresh run (optional, for testing)
 def clean_directories():
