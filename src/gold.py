@@ -1,13 +1,13 @@
 from pyspark.sql.functions import col, month, year, sum as spark_sum
 from delta.tables import DeltaTable
-import local_utils
+from src import utils
 
 def run_gold(spark):
     print("Iniciando camada Gold...")
     
-    silver_path = local_utils.SILVER_PATH
-    gold_fato_path = local_utils.GOLD_FATO_PATH
-    gold_agg_path = local_utils.GOLD_AGG_PATH
+    silver_path = utils.SILVER_PATH
+    gold_fato_path = utils.GOLD_FATO_PATH
+    gold_agg_path = utils.GOLD_AGG_PATH
     
     # Ler dados da Silver
     if not DeltaTable.isDeltaTable(spark, silver_path):
@@ -78,5 +78,5 @@ def run_gold(spark):
     print(f"Total de registros na Agregada: {df_agg_check.count()}")
 
 if __name__ == "__main__":
-    spark = local_utils.get_spark_session("GoldLayer")
+    spark = utils.get_spark_session("GoldLayer")
     run_gold(spark)

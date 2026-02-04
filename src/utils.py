@@ -1,9 +1,19 @@
 import os
 import shutil
 from pyspark.sql import SparkSession
-from delta import configure_spark_with_delta_pip
+
+def is_databricks():
+    """Verifica se o código está rodando no Databricks."""
+    return "DATABRICKS_RUNTIME_VERSION" in os.environ
 
 def get_spark_session(app_name="DesafioLocal"):
+    if is_databricks():
+        # No Databricks, a sessão já existe ou é gerenciada automaticamente
+        return SparkSession.builder.getOrCreate()
+    
+    # Configuração para execução local
+    from delta import configure_spark_with_delta_pip
+    
     builder = SparkSession.builder \
         .appName(app_name) \
         .config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension") \
@@ -15,15 +25,29 @@ def get_spark_session(app_name="DesafioLocal"):
         .config("spark.sql.warehouse.dir", os.path.abspath("./spark-warehouse"))
 
     spark = configure_spark_with_delta_pip(builder).getOrCreate()
+    
+    # Silenciar logs verbosos e erros específicos de Windows
+    spark.sparkContext.setLogLevel("ERROR")
+    log4j = spark._jvm.org.apache.log4j
+    logger = log4j.LogManager.getLogger("org.apache.spark.util.ShutdownHookManager")
+    logger.setLevel(log4j.Level.OFF)
+    
     return spark
 
 # Define paths
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-
-# Configure Hadoop for Windows
-HADOOP_HOME = os.path.join(BASE_DIR, "hadoop")
-os.environ["HADOOP_HOME"] = HADOOP_HOME
-os.environ["PATH"] += os.pathsep + os.path.join(HADOOP_HOME, "bin")
+if is_databricks():
+    # No Databricks Repos, os.getcwd() retorna a raiz do repo.
+    # Porém, para escrita de dados (Delta), é recomendável usar DBFS ou Volumes se for persistir.
+    # Aqui mantemos a lógica relativa para funcionar "out-of-the-box" no Repos, 
+    # mas em produção no Databricks, BASE_DIR deveria apontar para '/dbfs/...' ou '/Volumes/...'
+    BASE_DIR = os.getcwd()
+else:
+    BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    
+    # Configure Hadoop for Windows (apenas local)
+    HADOOP_HOME = os.path.join(BASE_DIR, "hadoop")
+    os.environ["HADOOP_HOME"] = HADOOP_HOME
+    os.environ["PATH"] += os.pathsep + os.path.join(HADOOP_HOME, "bin")
 
 DATA_RAW_PATH = os.path.join(BASE_DIR, "dados_vendas")
 BRONZE_PATH = os.path.join(BASE_DIR, "data", "bronze", "vendas")
@@ -43,5 +67,6 @@ def ensure_directories():
 # Clean up for fresh run (optional, for testing)
 def clean_directories():
     if os.path.exists(os.path.join(BASE_DIR, "data")):
-        shutil.rmtree(os.path.join(BASE_DIR, "data"))
+        # On Windows, ignore_errors=True helps avoid permission errors with open files
+        shutil.rmtree(os.path.join(BASE_DIR, "data"), ignore_errors=True)
     ensure_directories()

@@ -1,7 +1,7 @@
 import os
 from pyspark.sql.functions import current_timestamp, input_file_name
 from pyspark.sql.types import StructType, StructField, StringType, IntegerType, DoubleType, TimestampType
-import local_utils
+from src import utils
 
 def run_bronze(spark):
     print("Iniciando camada Bronze...")
@@ -17,12 +17,12 @@ def run_bronze(spark):
     ])
 
     # Caminho para os dados
-    data_path = local_utils.DATA_RAW_PATH
-    bronze_path = local_utils.BRONZE_PATH
-    processed_files_path = local_utils.PROCESSED_FILES_PATH
+    data_path = utils.DATA_RAW_PATH
+    bronze_path = utils.BRONZE_PATH
+    processed_files_path = utils.PROCESSED_FILES_PATH
 
     # Garantir que diretórios existam
-    local_utils.ensure_directories()
+    utils.ensure_directories()
 
     # Listar arquivos na pasta
     all_files = [f for f in os.listdir(data_path) if f.endswith('.csv')]
@@ -64,5 +64,5 @@ def run_bronze(spark):
     print(f"Total de registros na Bronze: {df_bronze_check.count()}")
 
 if __name__ == "__main__":
-    spark = local_utils.get_spark_session("BronzeLayer")
+    spark = utils.get_spark_session("BronzeLayer")
     run_bronze(spark)

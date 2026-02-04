@@ -1,13 +1,13 @@
 from pyspark.sql.functions import col, row_number
 from pyspark.sql.window import Window
 from delta.tables import DeltaTable
-import local_utils
+from src import utils
 
 def run_silver(spark):
     print("Iniciando camada Silver...")
     
-    bronze_path = local_utils.BRONZE_PATH
-    silver_path = local_utils.SILVER_PATH
+    bronze_path = utils.BRONZE_PATH
+    silver_path = utils.SILVER_PATH
     
     # Ler dados da Bronze
     # Verifica se existe dados na bronze antes
@@ -61,5 +61,5 @@ def run_silver(spark):
     print(f"Total de registros na Silver: {df_silver_check.count()}")
 
 if __name__ == "__main__":
-    spark = local_utils.get_spark_session("SilverLayer")
+    spark = utils.get_spark_session("SilverLayer")
     run_silver(spark)

@@ -1,8 +1,8 @@
 import argparse
-import local_utils
-import bronze
-import silver
-import gold
+from src import utils
+from src import bronze
+from src import silver
+from src import gold
 
 def main():
     parser = argparse.ArgumentParser(description="Executar pipeline de vendas localmente.")
@@ -11,12 +11,12 @@ def main():
 
     if args.clean:
         print("Limpando diretórios de dados...")
-        local_utils.clean_directories()
+        utils.clean_directories()
     else:
-        local_utils.ensure_directories()
+        utils.ensure_directories()
 
     # Inicializar Spark Session única para todo o pipeline
-    spark = local_utils.get_spark_session("VendasPipeline")
+    spark = utils.get_spark_session("VendasPipeline")
 
     try:
         # Executar Camada Bronze
