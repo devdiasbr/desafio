@@ -9,14 +9,15 @@ def main():
     parser.add_argument("--clean", action="store_true", help="Limpar diretórios de dados antes de executar.")
     args = parser.parse_args()
 
+    # Inicializar Spark Session única para todo o pipeline
+    spark = utils.get_spark_session("VendasPipeline")
+
     if args.clean:
         print("Limpando diretórios de dados...")
         utils.clean_directories()
     else:
-        utils.ensure_directories()
-
-    # Inicializar Spark Session única para todo o pipeline
-    spark = utils.get_spark_session("VendasPipeline")
+        # Garante recursos (Pastas locais ou Database no Databricks)
+        utils.ensure_resources(spark)
 
     try:
         # Executar Camada Bronze

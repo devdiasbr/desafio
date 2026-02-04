@@ -48,14 +48,18 @@ if is_databricks():
     # DATA_RAW_PATH continua no Workspace (assumindo que os CSVs estão lá e leitura é permitida)
     DATA_RAW_PATH = os.path.join(BASE_DIR, "dados_vendas")
     
-    # Nomes das tabelas
-    BRONZE_PATH = "bronze_vendas"
-    SILVER_PATH = "silver_vendas"
-    GOLD_FATO_PATH = "gold_fato_vendas"
-    GOLD_AGG_PATH = "gold_vendas_agregadas"
-    PROCESSED_FILES_PATH = "bronze_processed_files" # Não usado na nova lógica, mantido para compatibilidade
+    # Nome do Database específico para o projeto
+    DATABASE_NAME = "desafio_beca"
+
+    # Nomes das tabelas (com prefixo do database)
+    BRONZE_PATH = f"{DATABASE_NAME}.bronze_vendas"
+    SILVER_PATH = f"{DATABASE_NAME}.silver_vendas"
+    GOLD_FATO_PATH = f"{DATABASE_NAME}.gold_fato_vendas"
+    GOLD_AGG_PATH = f"{DATABASE_NAME}.gold_vendas_agregadas"
+    PROCESSED_FILES_PATH = f"{DATABASE_NAME}.bronze_processed_files" 
 
 else:
+    DATABASE_NAME = None # Não usado localmente da mesma forma (usa arquivos)
     # Configure Hadoop for Windows (apenas local)
     HADOOP_HOME = os.path.join(BASE_DIR, "hadoop")
     os.environ["HADOOP_HOME"] = HADOOP_HOME
@@ -70,9 +74,20 @@ else:
 
 # Ensure directories exist
 def ensure_directories():
+    pass # Mantido para compatibilidade, mas a lógica real está abaixo se precisar de algo específico
+    
+def ensure_database(spark):
+    """Garante que o database exista no Databricks."""
     if is_databricks():
-        # Tabelas gerenciadas não precisam de diretórios prévios
-        pass
+        spark.sql(f"CREATE DATABASE IF NOT EXISTS {DATABASE_NAME}")
+        # Opcional: Definir como atual para simplificar consultas manuais depois
+        spark.sql(f"USE {DATABASE_NAME}")
+
+def ensure_resources(spark=None):
+    """Função unificada para garantir recursos (diretórios locais ou database remoto)."""
+    if is_databricks():
+        if spark:
+            ensure_database(spark)
     else:
         os.makedirs(BRONZE_PATH, exist_ok=True)
         os.makedirs(SILVER_PATH, exist_ok=True)

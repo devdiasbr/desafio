@@ -21,8 +21,8 @@ def run_bronze(spark):
     bronze_path = utils.BRONZE_PATH
     processed_files_path = utils.PROCESSED_FILES_PATH
 
-    # Garantir que diretórios existam
-    utils.ensure_directories()
+    # Garantir que diretórios/db existam
+    utils.ensure_resources(spark)
 
     # Listar arquivos na pasta
     all_files = [f for f in os.listdir(data_path) if f.endswith('.csv')]
