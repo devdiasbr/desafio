@@ -41,17 +41,19 @@ def get_spark_session(app_name="DesafioLocal"):
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 if is_databricks():
-    # No Databricks, usamos DBFS para saída para evitar erros de sistema de arquivos somente leitura no Workspace
-    # DATA_RAW_PATH continua no Workspace (assumindo que os CSVs estão lá)
-    DBFS_BASE = "dbfs:/FileStore/desafio_beca_2026"
+    # No Databricks, usamos Tabelas Gerenciadas (Managed Tables)
+    # Isso delega ao Databricks a escolha do local de armazenamento (Hive/Unity Catalog)
+    # e evita erros de permissão em sistemas de arquivos somente leitura ou bloqueados (Public DBFS)
     
+    # DATA_RAW_PATH continua no Workspace (assumindo que os CSVs estão lá e leitura é permitida)
     DATA_RAW_PATH = os.path.join(BASE_DIR, "dados_vendas")
-    BRONZE_PATH = f"{DBFS_BASE}/data/bronze/vendas"
-    SILVER_PATH = f"{DBFS_BASE}/data/silver/vendas"
-    GOLD_FATO_PATH = f"{DBFS_BASE}/data/gold/fato_vendas"
-    GOLD_AGG_PATH = f"{DBFS_BASE}/data/gold/vendas_agregadas"
-    # PROCESSED_FILES_PATH não será mais usado com a nova lógica de idempotência baseada em Delta
-    PROCESSED_FILES_PATH = f"{DBFS_BASE}/data/bronze/processed_files"
+    
+    # Nomes das tabelas
+    BRONZE_PATH = "bronze_vendas"
+    SILVER_PATH = "silver_vendas"
+    GOLD_FATO_PATH = "gold_fato_vendas"
+    GOLD_AGG_PATH = "gold_vendas_agregadas"
+    PROCESSED_FILES_PATH = "bronze_processed_files" # Não usado na nova lógica, mantido para compatibilidade
 
 else:
     # Configure Hadoop for Windows (apenas local)
@@ -69,8 +71,7 @@ else:
 # Ensure directories exist
 def ensure_directories():
     if is_databricks():
-        # No Databricks, o Spark cria diretórios automaticamente ao escrever no DBFS.
-        # Não usamos os.makedirs em caminhos dbfs:/
+        # Tabelas gerenciadas não precisam de diretórios prévios
         pass
     else:
         os.makedirs(BRONZE_PATH, exist_ok=True)
@@ -81,10 +82,58 @@ def ensure_directories():
 
 # Clean up for fresh run (optional, for testing)
 def clean_directories():
-    if os.path.exists(os.path.join(BASE_DIR, "data")):
-        # On Windows, ignore_errors=True helps avoid permission errors with open files
-        shutil.rmtree(os.path.join(BASE_DIR, "data"), ignore_errors=True)
-    ensure_directories()
+    if is_databricks():
+        # No Databricks, clean seria dropar tabelas. Cuidado ao usar em produção.
+        pass
+    else:
+        if os.path.exists(os.path.join(BASE_DIR, "data")):
+            # On Windows, ignore_errors=True helps avoid permission errors with open files
+            shutil.rmtree(os.path.join(BASE_DIR, "data"), ignore_errors=True)
+        ensure_directories()
+
+# --- Helpers Híbridos (Local Path vs Managed Table) ---
+
+def is_path(identifier):
+    """Verifica se o identificador parece ser um caminho de arquivo."""
+    return "/" in identifier or "\\" in identifier or ":" in identifier
+
+def read_delta(spark, identifier):
+    """Lê Delta table ou path de forma consistente."""
+    if is_path(identifier):
+        return spark.read.format("delta").load(identifier)
+    else:
+        return spark.read.table(identifier)
+
+def write_delta(df, identifier, mode="append", partitionBy=None):
+    """Escreve Delta table ou path de forma consistente."""
+    writer = df.write.format("delta").mode(mode)
+    if partitionBy:
+        writer = writer.partitionBy(partitionBy)
+        
+    if is_path(identifier):
+        writer.save(identifier)
+    else:
+        writer.saveAsTable(identifier)
+
+def get_sql_target(identifier):
+    """Retorna a cláusula correta para SQL (delta.`path` ou table_name)."""
+    if is_path(identifier):
+        clean_path = identifier.replace("\\", "/")
+        return f"delta.`{clean_path}`"
+    else:
+        return identifier
+
+def delta_exists(spark, identifier):
+    """Verifica se a tabela/path Delta existe."""
+    from delta.tables import DeltaTable
+    try:
+        if is_path(identifier):
+            return DeltaTable.isDeltaTable(spark, identifier)
+        else:
+            return spark.catalog.tableExists(identifier)
+    except Exception:
+        return False
+
 
 # Helper para adicionar coluna de nome de arquivo (Compatibilidade Híbrida)
 def add_filename_column(df, col_name="nome_arquivo"):

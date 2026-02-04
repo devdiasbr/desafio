@@ -10,11 +10,11 @@ def run_gold(spark):
     gold_agg_path = utils.GOLD_AGG_PATH
     
     # Ler dados da Silver
-    if not DeltaTable.isDeltaTable(spark, silver_path):
+    if not utils.delta_exists(spark, silver_path):
         print("Tabela Silver não encontrada. Execute a camada Silver primeiro.")
         return
 
-    df_silver = spark.read.format("delta").load(silver_path)
+    df_silver = utils.read_delta(spark, silver_path)
     
     if df_silver.count() == 0:
         print("Tabela Silver vazia.")
@@ -24,15 +24,15 @@ def run_gold(spark):
     df_fato = df_silver.select("codigo_venda", "numero_fiscal", "id_produto", "nome_produto", "valor", "timestamp_venda", "data_carga")
     
     # Paths for SQL
-    gold_fato_path_sql = gold_fato_path.replace("\\", "/")
-    gold_agg_path_sql = gold_agg_path.replace("\\", "/")
+    target_fato = utils.get_sql_target(gold_fato_path)
+    target_agg = utils.get_sql_target(gold_agg_path)
 
     # MERGE INTO Fato
-    if DeltaTable.isDeltaTable(spark, gold_fato_path):
+    if utils.delta_exists(spark, gold_fato_path):
         print("Realizando MERGE na Fato Vendas...")
         df_fato.createOrReplaceTempView("temp_fato")
         spark.sql(f"""
-        MERGE INTO delta.`{gold_fato_path_sql}` AS target
+        MERGE INTO {target_fato} AS target
         USING temp_fato AS source
         ON target.codigo_venda = source.codigo_venda
         WHEN MATCHED THEN
@@ -42,18 +42,18 @@ def run_gold(spark):
         """)
     else:
         print("Criando tabela Fato Vendas inicial...")
-        df_fato.write.format("delta").save(gold_fato_path)
+        utils.write_delta(df_fato, gold_fato_path)
 
     # Tabela Agregada: somatório por id_produto e mês
     df_agg = df_silver.groupBy("id_produto", "nome_produto", year("timestamp_venda").alias("ano"), month("timestamp_venda").alias("mes")) \
                       .agg(spark_sum("valor").alias("valor_total"))
     
     # MERGE INTO Agregada
-    if DeltaTable.isDeltaTable(spark, gold_agg_path):
+    if utils.delta_exists(spark, gold_agg_path):
         print("Realizando MERGE na Vendas Agregadas...")
         df_agg.createOrReplaceTempView("temp_agg")
         spark.sql(f"""
-        MERGE INTO delta.`{gold_agg_path_sql}` AS target
+        MERGE INTO {target_agg} AS target
         USING temp_agg AS source
         ON target.id_produto = source.id_produto AND target.ano = source.ano AND target.mes = source.mes
         WHEN MATCHED THEN
@@ -63,17 +63,17 @@ def run_gold(spark):
         """)
     else:
         print("Criando tabela Vendas Agregadas inicial...")
-        df_agg.write.format("delta").save(gold_agg_path)
+        utils.write_delta(df_agg, gold_agg_path)
 
     print("Camada Gold atualizada.")
     
     # Validação
     print("Validando camada Gold...")
-    df_fato_check = spark.read.format("delta").load(gold_fato_path)
+    df_fato_check = utils.read_delta(spark, gold_fato_path)
     df_fato_check.show(10)
     print(f"Total de registros na Fato: {df_fato_check.count()}")
     
-    df_agg_check = spark.read.format("delta").load(gold_agg_path)
+    df_agg_check = utils.read_delta(spark, gold_agg_path)
     df_agg_check.show(10)
     print(f"Total de registros na Agregada: {df_agg_check.count()}")
 

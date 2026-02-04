@@ -30,8 +30,8 @@ def run_bronze(spark):
     
     # Verificar arquivos já processados lendo diretamente da tabela Delta (Idempotência)
     try:
-        # Tenta ler a tabela Bronze existente
-        df_processed = spark.read.format("delta").load(bronze_path).select("nome_arquivo").distinct()
+        # Tenta ler a tabela Bronze existente usando helper híbrido
+        df_processed = utils.read_delta(spark, bronze_path).select("nome_arquivo").distinct()
         rows = df_processed.collect()
         # Extrai apenas o nome do arquivo (basename) do caminho completo
         processed_files = {os.path.basename(r["nome_arquivo"]) for r in rows}
@@ -55,8 +55,8 @@ def run_bronze(spark):
         # Adicionar nome do arquivo usando helper híbrido (suporte a Databricks Shared/UC)
         df_bronze = utils.add_filename_column(df_bronze, "nome_arquivo")
         
-        # Salvar em Delta (append para incremental)
-        df_bronze.write.format("delta").mode("append").save(bronze_path)
+        # Salvar em Delta (append para incremental) usando helper híbrido
+        utils.write_delta(df_bronze, bronze_path, mode="append")
         
         print(f"Processados {len(new_files)} arquivos novos.")
     else:
@@ -64,7 +64,7 @@ def run_bronze(spark):
 
     # Validação
     print("Validando camada Bronze...")
-    df_bronze_check = spark.read.format("delta").load(bronze_path)
+    df_bronze_check = utils.read_delta(spark, bronze_path)
     df_bronze_check.show(10)
     print(f"Total de registros na Bronze: {df_bronze_check.count()}")
 

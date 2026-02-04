@@ -11,11 +11,11 @@ def run_silver(spark):
     
     # Ler dados da Bronze
     # Verifica se existe dados na bronze antes
-    if not DeltaTable.isDeltaTable(spark, bronze_path):
+    if not utils.delta_exists(spark, bronze_path):
         print("Tabela Bronze não encontrada. Execute a camada Bronze primeiro.")
         return
 
-    df_bronze = spark.read.format("delta").load(bronze_path)
+    df_bronze = utils.read_delta(spark, bronze_path)
     
     if df_bronze.count() == 0:
         print("Tabela Bronze vazia.")
@@ -28,19 +28,15 @@ def run_silver(spark):
                          .drop("row_num")
     
     # Verifica se a tabela Silver já existe
-    if DeltaTable.isDeltaTable(spark, silver_path):
+    if utils.delta_exists(spark, silver_path):
         print("Realizando MERGE na Silver...")
         # MERGE INTO Silver
         df_silver.createOrReplaceTempView("temp_silver")
         
-        # Note: Delta paths in SQL need `delta.` prefix and backticks usually
-        # But for local paths with spaces or special chars, absolute path is best.
-        # Ensure path is formatted correctly for SQL
-        # We need to escape backslashes on Windows for SQL strings if they exist
-        silver_path_sql = silver_path.replace("\\", "/")
+        target_table = utils.get_sql_target(silver_path)
         
         spark.sql(f"""
-        MERGE INTO delta.`{silver_path_sql}` AS target
+        MERGE INTO {target_table} AS target
         USING temp_silver AS source
         ON target.codigo_venda = source.codigo_venda
         WHEN MATCHED THEN
@@ -50,13 +46,13 @@ def run_silver(spark):
         """)
     else:
         print("Criando tabela Silver inicial...")
-        df_silver.write.format("delta").partitionBy("timestamp_venda").save(silver_path)
+        utils.write_delta(df_silver, silver_path, partitionBy="timestamp_venda")
     
     print("Camada Silver atualizada.")
     
     # Validação
     print("Validando camada Silver...")
-    df_silver_check = spark.read.format("delta").load(silver_path)
+    df_silver_check = utils.read_delta(spark, silver_path)
     df_silver_check.show(10)
     print(f"Total de registros na Silver: {df_silver_check.count()}")
 
