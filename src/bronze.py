@@ -42,8 +42,10 @@ def run_bronze(spark):
         df = spark.read.schema(schema).csv(file_paths)
         
         # Adicionar colunas
-        df_bronze = df.withColumn("data_carga", current_timestamp()) \
-                      .withColumn("nome_arquivo", input_file_name())
+        df_bronze = df.withColumn("data_carga", current_timestamp())
+        
+        # Adicionar nome do arquivo usando helper híbrido (suporte a Databricks Shared/UC)
+        df_bronze = utils.add_filename_column(df_bronze, "nome_arquivo")
         
         # Salvar em Delta (append para incremental)
         df_bronze.write.format("delta").mode("append").save(bronze_path)

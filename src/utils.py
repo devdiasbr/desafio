@@ -1,6 +1,7 @@
 import os
 import shutil
 from pyspark.sql import SparkSession
+from pyspark.sql.functions import input_file_name, col
 
 def is_databricks():
     """Verifica se o código está rodando no Databricks."""
@@ -70,3 +71,21 @@ def clean_directories():
         # On Windows, ignore_errors=True helps avoid permission errors with open files
         shutil.rmtree(os.path.join(BASE_DIR, "data"), ignore_errors=True)
     ensure_directories()
+
+# Helper para adicionar coluna de nome de arquivo (Compatibilidade Híbrida)
+def add_filename_column(df, col_name="nome_arquivo"):
+    """
+    Adiciona uma coluna com o nome do arquivo de origem.
+    Usa _metadata.file_path no Databricks (suporte a UC/Shared) e input_file_name() localmente.
+    """
+    if is_databricks():
+        # No Databricks com modo Shared/Unity Catalog, input_file_name() é bloqueado.
+        # Deve-se usar a coluna de metadados _metadata.file_path
+        try:
+            return df.withColumn(col_name, col("_metadata.file_path"))
+        except Exception:
+            # Fallback caso _metadata não esteja disponível (versões antigas ou formatos não suportados)
+            return df.withColumn(col_name, input_file_name())
+    else:
+        # Execução local padrão
+        return df.withColumn(col_name, input_file_name())
