@@ -10,7 +10,12 @@ def is_databricks():
 def get_spark_session(app_name="DesafioLocal"):
     if is_databricks():
         # No Databricks, a sessão já existe ou é gerenciada automaticamente
-        return SparkSession.builder.getOrCreate()
+        try:
+             # Tenta obter a sessão ativa existente
+             return SparkSession.builder.getOrCreate()
+        except Exception:
+             # Se falhar, tenta criar uma nova (útil se a anterior morreu)
+             return SparkSession.builder.appName(app_name).getOrCreate()
     
     # Configuração para execução local
     from delta import configure_spark_with_delta_pip

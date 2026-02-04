@@ -34,7 +34,17 @@ class TestPipeline(unittest.TestCase):
             cls.test_dir = f"dbfs:/tmp/test_pipeline_{cls.test_id}"
             
             # Initialize Spark first to get DBUtils
-            cls.spark = utils.get_spark_session("TestPipeline")
+            # FORCE creation of a new session if the current one is broken
+            # This is a workaround for the persistent SESSION_CLOSED error
+            try:
+                cls.spark = utils.get_spark_session("TestPipeline")
+                # Test if session is alive
+                cls.spark.sql("SELECT 1").collect()
+            except Exception:
+                print("Session seems dead, trying to create a new one...")
+                from pyspark.sql import SparkSession
+                cls.spark = SparkSession.builder.appName("TestPipeline_Recovery").getOrCreate()
+            
             cls.dbutils = utils.get_dbutils(cls.spark)
             
             if cls.dbutils:
