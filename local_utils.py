@@ -1,0 +1,47 @@
+import os
+import shutil
+from pyspark.sql import SparkSession
+from delta import configure_spark_with_delta_pip
+
+def get_spark_session(app_name="DesafioLocal"):
+    builder = SparkSession.builder \
+        .appName(app_name) \
+        .config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension") \
+        .config("spark.sql.catalog.spark_catalog", "org.apache.spark.sql.delta.catalog.DeltaCatalog") \
+        .config("spark.driver.memory", "2g") \
+        .config("spark.executor.memory", "2g") \
+        .config("spark.driver.host", "127.0.0.1") \
+        .config("spark.driver.bindAddress", "127.0.0.1") \
+        .config("spark.sql.warehouse.dir", os.path.abspath("./spark-warehouse"))
+
+    spark = configure_spark_with_delta_pip(builder).getOrCreate()
+    return spark
+
+# Define paths
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# Configure Hadoop for Windows
+HADOOP_HOME = os.path.join(BASE_DIR, "hadoop")
+os.environ["HADOOP_HOME"] = HADOOP_HOME
+os.environ["PATH"] += os.pathsep + os.path.join(HADOOP_HOME, "bin")
+
+DATA_RAW_PATH = os.path.join(BASE_DIR, "dados_vendas")
+BRONZE_PATH = os.path.join(BASE_DIR, "data", "bronze", "vendas")
+SILVER_PATH = os.path.join(BASE_DIR, "data", "silver", "vendas")
+GOLD_FATO_PATH = os.path.join(BASE_DIR, "data", "gold", "fato_vendas")
+GOLD_AGG_PATH = os.path.join(BASE_DIR, "data", "gold", "vendas_agregadas")
+PROCESSED_FILES_PATH = os.path.join(BASE_DIR, "data", "bronze", "processed_files")
+
+# Ensure directories exist
+def ensure_directories():
+    os.makedirs(BRONZE_PATH, exist_ok=True)
+    os.makedirs(SILVER_PATH, exist_ok=True)
+    os.makedirs(GOLD_FATO_PATH, exist_ok=True)
+    os.makedirs(GOLD_AGG_PATH, exist_ok=True)
+    os.makedirs(PROCESSED_FILES_PATH, exist_ok=True)
+
+# Clean up for fresh run (optional, for testing)
+def clean_directories():
+    if os.path.exists(os.path.join(BASE_DIR, "data")):
+        shutil.rmtree(os.path.join(BASE_DIR, "data"))
+    ensure_directories()
