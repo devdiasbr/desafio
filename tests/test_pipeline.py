@@ -1,7 +1,20 @@
 import unittest
 import os
+import sys
 import shutil
 import tempfile
+
+# Add project root to sys.path to ensure 'src' module can be found
+try:
+    # Local execution
+    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+except NameError:
+    # Databricks execution (interactive mode where __file__ is not defined)
+    project_root = os.getcwd()
+
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
 from pyspark.sql import SparkSession
 from src import utils
 from src import bronze, silver, gold
@@ -111,4 +124,7 @@ class TestPipeline(unittest.TestCase):
         self.assertTrue("mes" in df_agg.columns)
 
 if __name__ == '__main__':
+    if utils.is_databricks():
+        # Limpar argumentos do Databricks para não confundir o unittest
+        sys.argv = [sys.argv[0]]
     unittest.main()
