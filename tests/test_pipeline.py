@@ -28,9 +28,17 @@ class TestPipeline(unittest.TestCase):
         # Create a temporary directory for the test execution
         if utils.is_databricks():
             import uuid
-            # Use /dbfs/tmp to avoid local filesystem restrictions on Databricks
-            cls.test_dir = f"/dbfs/tmp/test_pipeline_{uuid.uuid4().hex}"
-            os.makedirs(cls.test_dir, exist_ok=True)
+            # Use /dbfs/FileStore/tmp to ensure write access and FUSE compatibility
+            # /dbfs/tmp might be restricted or non-existent in some environments
+            cls.test_dir = f"/dbfs/FileStore/tmp/test_pipeline_{uuid.uuid4().hex}"
+            try:
+                os.makedirs(cls.test_dir, exist_ok=True)
+            except OSError as e:
+                print(f"Warning: Failed to create DBFS path via os.makedirs: {e}")
+                # Fallback: try to continue, maybe it already exists or we can't write but Spark can?
+                # But we need to write files via shutil, so this is critical.
+                # If this fails, we might need to use dbutils, but we are in a standard python file.
+                raise e
         else:
             cls.test_dir = tempfile.mkdtemp()
         
