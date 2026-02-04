@@ -26,7 +26,13 @@ class TestPipeline(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         # Create a temporary directory for the test execution
-        cls.test_dir = tempfile.mkdtemp()
+        if utils.is_databricks():
+            import uuid
+            # Use /dbfs/tmp to avoid local filesystem restrictions on Databricks
+            cls.test_dir = f"/dbfs/tmp/test_pipeline_{uuid.uuid4().hex}"
+            os.makedirs(cls.test_dir, exist_ok=True)
+        else:
+            cls.test_dir = tempfile.mkdtemp()
         
         # Override paths in utils to point to the temp directory
         cls.original_base_dir = utils.BASE_DIR
@@ -49,11 +55,14 @@ class TestPipeline(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
-        cls.spark.stop()
+        if not utils.is_databricks():
+            cls.spark.stop()
+            
         # Restore original paths
         utils.BASE_DIR = cls.original_base_dir
         # Clean up temp dir
-        shutil.rmtree(cls.test_dir)
+        if os.path.exists(cls.test_dir):
+            shutil.rmtree(cls.test_dir)
 
     def setUp(self):
         # Clean data directories before each test
